@@ -10,6 +10,7 @@
   "host_permissions": [
     "https://www.googleapis.com/*"
   ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAokX4PWP1ez70gr1HIByJWNgRUwFcfn3f04qYJKGtrg/Cx5lj2B6Ky9rAwy6VIWEvStvFHxQ1GJwypYFC+S+1jZIngS2shVACDHXiq2D/V2jC7lPOvIqm90juQDfZPdw5mHB4We/WQ1FeMBy7UBq5U1TS8LI8+2/UUis1CT2mp5EedL/GQFnnLZ6ulFBPCNSR/PB2zgUegXr5Qo91s+mZ2Bqu6ivzgA+d7f8WcrKMeL4NpInH7viXI+ZRFx9+RqK0FjzSjsxujqjrBYfB4ocULlU4ovIHDBwOis8rhXREwdB2UcZwKqZ3nFabzfV5efLAgHn+NTvJqlFii+O9EYXvsQIDAQAB",
   "oauth2": {
     "client_id": "618445582756-5p1bsbbgjtnrgtk52kb2f1ommjrojd6r.apps.googleusercontent.com",
     "scopes": [
