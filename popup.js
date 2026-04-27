@@ -9,7 +9,8 @@ const state = {
   selectedDays: new Set([1, 2, 3, 4, 5]),
   selectedStyle: 'professional',
   lastResult: '',
-  allCalendars: [],
+  allCalendars: [],      // { id, summary }[]
+  calendarToggles: {},   // { [calendarId]: boolean }
 };
 
 // ── DOM refs ─────────────────────────────────────────────────
@@ -264,24 +265,77 @@ function bindWorkHoursToggle() {
 }
 
 // ── Calendar API ──────────────────────────────────────────────
-async function fetchAllCalendarIds(token) {
-  const res = await fetch(
-    'https://www.googleapis.com/calendar/v3/users/me/calendarList?fields=items(id,selected,accessRole)',
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (!res.ok) return [{ id: 'primary' }];
-  const data = await res.json();
-  const items = (data.items || []).filter(
-    (c) => c.selected !== false && ['owner', 'writer', 'reader', 'freeBusyReader'].includes(c.accessRole)
-  );
-  return items.length > 0 ? items.map((c) => ({ id: c.id })) : [{ id: 'primary' }];
+async function loadAndRenderCalendars(token) {
+  const listEl = $('calendar-list');
+  listEl.innerHTML = '<div class="calendar-loading">Loading calendars…</div>';
+
+  try {
+    const res = await fetch(
+      'https://www.googleapis.com/calendar/v3/users/me/calendarList?fields=items(id,summary,selected,accessRole)',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const items = (data.items || []).filter(
+      (c) => c.selected !== false && ['owner', 'writer', 'reader', 'freeBusyReader'].includes(c.accessRole)
+    );
+    state.allCalendars = items;
+
+    // Load persisted toggle state
+    const stored = await chrome.storage.local.get('calendarToggles');
+    const saved = stored.calendarToggles || {};
+    state.calendarToggles = {};
+    items.forEach((cal) => {
+      state.calendarToggles[cal.id] = saved[cal.id] !== false; // default on
+    });
+
+    renderCalendarList();
+  } catch {
+    listEl.innerHTML = '<div class="calendar-loading">Could not load calendars.</div>';
+  }
+}
+
+function renderCalendarList() {
+  const listEl = $('calendar-list');
+  if (state.allCalendars.length === 0) {
+    listEl.innerHTML = '<div class="calendar-loading">No calendars found.</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  state.allCalendars.forEach((cal) => {
+    const item = document.createElement('div');
+    item.className = 'calendar-item';
+    const checked = state.calendarToggles[cal.id] !== false;
+    const name = cal.summary || cal.id;
+
+    item.innerHTML = `
+      <span class="calendar-item-name" title="${name}">${name}</span>
+      <label class="toggle-switch">
+        <input type="checkbox" ${checked ? 'checked' : ''} data-cal-id="${cal.id}" />
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </label>
+    `;
+
+    item.querySelector('input').addEventListener('change', async (e) => {
+      state.calendarToggles[cal.id] = e.target.checked;
+      await chrome.storage.local.set({ calendarToggles: { ...state.calendarToggles } });
+    });
+
+    listEl.appendChild(item);
+  });
 }
 
 async function fetchFreeBusy(token, startDate, endDate, timezone) {
   const timeMin = new Date(`${startDate}T00:00:00`).toISOString();
   const timeMax = new Date(`${endDate}T23:59:59`).toISOString();
 
-  const calendarItems = await fetchAllCalendarIds(token);
+  // Use the user-toggled calendar list; fall back to primary if none loaded
+  const calendarItems = state.allCalendars.length > 0
+    ? state.allCalendars
+        .filter((c) => state.calendarToggles[c.id] !== false)
+        .map((c) => ({ id: c.id }))
+    : [{ id: 'primary' }];
 
   const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
     method: 'POST',
@@ -642,6 +696,7 @@ async function init() {
       state.authToken = token;
       await chrome.storage.local.set({ authToken: token });
       showScreen('controls');
+      loadAndRenderCalendars(token);
     } catch (err) {
       showError(err?.message || err || 'Unknown error. Check the extension ID and OAuth client type.', 'auth');
       $('btn-connect').disabled = false;
@@ -676,6 +731,7 @@ async function init() {
       if (token) {
         state.authToken = token;
         showScreen('controls');
+        loadAndRenderCalendars(token);
         return;
       }
     }
