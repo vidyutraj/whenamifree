@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "WhenAmIFree",
+  "version": "1.0.0",
+  "description": "Find your free time and draft availability messages for recruiters in seconds.",
+  "permissions": [
+    "identity",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "618445582756-5p1bsbbgjtnrgtk52kb2f1ommjrojd6r.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WhenAmIFree",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<!--
+  WhenAmIFree — Local Test Harness
+  Run: python3 -m http.server 8081
+  Open: http://localhost:8081/test.html
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WhenAmIFree — Test</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body { width: 100%; min-height: 100vh; }
+    .screen { position: relative; width: 100%; opacity: 1; transform: none; pointer-events: all; }
+    .screen:not(.active) { display: none; }
+
+    .test-layout { display: flex; width: 100%; min-height: 100vh; }
+
+    /* Left column — popup controls */
+    .test-left {
+      width: 380px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      position: sticky; top: 0;
+      max-height: 100vh; overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+    .controls-footer { position: relative; background: var(--bg); }
+    .controls-screen { padding-bottom: 0; }
+    .test-left .btn-signout { display: none; }
+
+    /* Right column */
+    .test-right {
+      flex: 1; padding: 28px; min-width: 0;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    /* Auth card */
+    .auth-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    .auth-card-title {
+      font-family: var(--font-serif);
+      font-size: 17px; color: var(--text-primary);
+      margin-bottom: 5px;
+    }
+    .auth-card-sub {
+      font-size: 11.5px; color: var(--text-muted);
+      line-height: 1.65; margin-bottom: 16px;
+    }
+    .auth-card-sub a { color: var(--accent); text-decoration: none; }
+    .auth-card-sub a:hover { text-decoration: underline; }
+    .auth-card-sub code {
+      font-family: var(--font-mono); font-size: 10.5px;
+      background: var(--bg-elevated); padding: 1px 6px;
+      border-radius: 3px; color: var(--text-secondary);
+    }
+
+    .client-id-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .client-id-row input {
+      flex: 1; background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-primary);
+      font-family: var(--font-mono); font-size: 11px; padding: 8px 10px;
+      outline: none; transition: border-color var(--transition);
+    }
+    .client-id-row input:focus { border-color: var(--border-focus); }
+    .client-id-row input::placeholder { color: var(--text-muted); }
+
+    .sign-in-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* Signed-in state */
+    .signed-in-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--accent-bg); border: 1px solid rgba(232,195,122,0.25);
+      border-radius: var(--radius-sm); padding: 9px 12px;
+    }
+    .signed-in-info { display: flex; align-items: center; gap: 8px; }
+    .signed-in-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+    .signed-in-email { font-size: 12px; color: var(--accent); font-family: var(--font-mono); }
+
+    /* Mock only */
+    .mock-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 9px 12px;
+    }
+    .mock-row-info { display: flex; align-items: center; gap: 8px; }
+    .mock-dot { width: 7px; height: 7px; background: var(--text-muted); border-radius: 50%; }
+
+    /* Source tabs */
+    .source-section { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .source-tabs { display: flex; gap: 6px; }
+    .source-tab {
+      flex: 1; padding: 7px; text-align: center;
+      font-family: var(--font-mono); font-size: 11.5px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--radius-pill); cursor: pointer;
+      color: var(--text-secondary); transition: all var(--transition);
+    }
+    .source-tab.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    /* Calendar selector */
+    .cal-selector {
+      border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden;
+    }
+    .cal-selector-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: var(--bg-elevated);
+      font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      cursor: pointer; user-select: none;
+      transition: color var(--transition);
+    }
+    .cal-selector-header:hover { color: var(--text-secondary); }
+    .cal-list { display: none; }
+    .cal-list.open { display: block; }
+    .cal-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 12px; border-top: 1px solid var(--border);
+      cursor: pointer; transition: background var(--transition);
+    }
+    .cal-item:hover { background: var(--bg-elevated); }
+    .cal-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .cal-item-name {
+      font-size: 11.5px; color: var(--text-secondary); font-family: var(--font-mono);
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Result panel */
+    .result-panel {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); overflow: hidden; flex: 1;
+      display: flex; flex-direction: column;
+    }
+    .result-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .result-panel-title {
+      font-family: var(--font-serif); font-size: 16px; color: var(--text-primary);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .result-panel-actions { display: flex; gap: 8px; align-items: center; }
+    .result-meta { font-size: 11px; color: var(--text-muted); }
+    .result-panel-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+    .result-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 12px; text-align: center; line-height: 1.9;
+      min-height: 260px;
+    }
+    #result-textarea-test {
+      flex: 1; width: 100%; min-height: 260px;
+      background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-primary);
+      font-family: var(--font-mono); font-size: 12px; line-height: 1.75;
+      padding: 14px; resize: vertical; outline: none; display: none;
+    }
+
+    /* Custom duration */
+    .custom-duration-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 6px;
+    }
+    .custom-duration-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .custom-duration-input {
+      width: 90px; padding: 5px 10px; font-size: 12px;
+    }
+    .custom-duration-input::-webkit-inner-spin-button,
+    .custom-duration-input::-webkit-outer-spin-button { opacity: 0.4; }
+  </style>
+</head>
+<body>
+<div class="test-layout">
+
+  <!-- ══ LEFT: popup UI ══ -->
+  <div class="test-left">
+    <div class="screen controls-screen active">
+      <div class="header">
+        <div class="header-brand">
+          <span class="wordmark" style="font-size:17px;letter-spacing:-0.5px">WhenAmIFree</span>
+          <span class="tagline">test</span>
+        </div>
+      </div>
+
+      <div class="controls-body">
+
+        <div class="form-group">
+          <label class="form-label">Date Range</label>
+          <div class="date-inputs">
+            <input type="date" id="date-start" class="input-field" />
+            <input type="date" id="date-end" class="input-field" />
+          </div>
+          <div class="chip-group" id="quick-date-chips">
+            <button class="chip" data-range="this-week">This week</button>
+            <button class="chip" data-range="next-week">Next week</button>
+            <button class="chip" data-range="next-2-weeks">Next 2 weeks</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Available Hours</label>
+          <div class="toggle-row">
+            <span class="toggle-label">Work hours only (9 am – 5 pm)</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-work-hours" checked />
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </label>
+          </div>
+          <div class="custom-hours" id="custom-hours">
+            <div>
+              <label class="form-label" style="margin-bottom:4px">From</label>
+              <input type="time" id="custom-start" class="input-field" value="09:00" />
+            </div>
+            <div>
+              <label class="form-label" style="margin-bottom:4px">To</label>
+              <input type="time" id="custom-end" class="input-field" value="17:00" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Minimum Slot Duration</label>
+          <div class="chip-group" id="duration-chips">
+            <button class="chip" data-duration="30">30 min</button>
+            <button class="chip selected" data-duration="45">45 min</button>
+            <button class="chip" data-duration="60">60 min</button>
+            <button class="chip" data-duration="90">90 min</button>
+          </div>
+          <div class="custom-duration-row">
+            <span class="custom-duration-label">Custom</span>
+            <input type="number" id="custom-duration" class="input-field custom-duration-input" min="5" max="480" placeholder="min" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Days of Week</label>
+          <div class="day-chips" id="day-chips">
+            <button class="day-chip selected" data-day="1">M</button>
+            <button class="day-chip selected" data-day="2">T</button>
+            <button class="day-chip selected" data-day="3">W</button>
+            <button class="day-chip selected" data-day="4">Th</button>
+            <button class="day-chip selected" data-day="5">F</button>
+            <button class="day-chip" data-day="6">Sa</button>
+            <button class="day-chip" data-day="0">Su</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Timezone</label>
+          <select id="timezone-select" class="select-field"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Message Style</label>
+          <div class="chip-group" id="style-chips">
+            <button class="chip selected" data-style="professional">Professional</button>
+            <button class="chip" data-style="casual">Casual</button>
+            <button class="chip" data-style="slots">Slots only</button>
+          </div>
+        </div>
+
+        <div id="controls-error" class="notice error" style="display:none;"></div>
+      </div>
+
+      <div class="controls-footer">
+        <button id="btn-generate" class="btn-generate">
+          <div class="spinner"></div>
+          <span class="btn-text">Find My Availability</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RIGHT: auth + output ══ -->
+  <div class="test-right">
+
+    <!-- Auth card -->
+    <div class="auth-card">
+      <div class="auth-card-title" id="auth-card-title">Connect your Google Calendar</div>
+
+      <!-- Unsigned -->
+      <div id="auth-unsigned">
+        <div class="client-id-row" id="client-id-row">
+          <input type="text" id="client-id-input" placeholder="client_id (saved after first use)" spellcheck="false" />
+        </div>
+        <div class="sign-in-actions">
+          <button class="btn-primary" onclick="startOAuth()">
+            <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Sign in with Google
+          </button>
+          <span style="font-size:11px;color:var(--text-muted)">or</span>
+          <button class="btn-ghost" onclick="useMockOnly()">Use mock data</button>
+        </div>
+        <div id="auth-error" class="notice error" style="display:none;margin-top:12px;"></div>
+      </div>
+
+      <!-- Signed in -->
+      <div id="auth-signed" style="display:none">
+        <div class="signed-in-row">
+          <div class="signed-in-info">
+            <div class="signed-in-dot"></div>
+            <span class="signed-in-email" id="signed-in-label">Connected</span>
+          </div>
+          <button class="btn-ghost" onclick="signOut()" style="font-size:11px">sign out</button>
+        </div>
+        <div class="source-section" id="source-section">
+          <div class="source-tabs">
+            <div class="source-tab active" id="tab-real" onclick="switchSource('real')">My Calendar</div>
+            <div class="source-tab" id="tab-mock" onclick="switchSource('mock')">Mock Data</div>
+          </div>
+          <div class="cal-selector" id="cal-selector" style="display:none">
+            <div class="cal-selector-header" onclick="toggleCalList()">
+              <span id="cal-selector-label">Calendars included</span>
+              <span id="cal-selector-toggle">▾</span>
+            </div>
+            <div class="cal-list" id="cal-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mock only -->
+      <div id="auth-mock-only" style="display:none">
+        <div class="mock-row">
+          <div class="mock-row-info">
+            <div class="mock-dot"></div>
+            <span style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">Mock data mode</span>
+          </div>
+          <button class="btn-ghost" onclick="resetAuth()" style="font-size:11px">switch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output panel -->
+    <div class="result-panel">
+      <div class="result-panel-header">
+        <div class="result-panel-title">
+          <div class="result-title-dot" id="result-dot" style="background:var(--border)"></div>
+          Output
+        </div>
+        <div class="result-panel-actions">
+          <span class="result-meta" id="result-meta" style="display:none"></span>
+          <button id="btn-copy-test" class="btn-ghost" style="display:none" onclick="copyResult()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+        </div>
+      </div>
+      <div class="result-panel-body">
+        <div id="result-empty" class="result-empty">
+          Sign in (or use mock data), set your preferences,<br>
+          then click <strong style="color:var(--text-secondary)">Find My Availability</strong>
+        </div>
+        <textarea id="result-textarea-test" readonly></textarea>
+      </div>
+    </div>
+
+  </div><!-- /test-right -->
+</div><!-- /test-layout -->
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ─── Config ──────────────────────────────────────────────────
+   Hardcode your client_id here to skip pasting it every time. */
+const HARDCODED_CLIENT_ID = '';
+const REDIRECT_URI = `${location.origin}${location.pathname}`;
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly email openid';
+
+/* ─── State ─────────────────────────────────────────────────── */
+const state = {
+  token: null,
+  email: null,
+  source: 'real',
+  mode: 'unsigned',
+  selectedDuration: 45,
+  selectedDays: new Set([1, 2, 3, 4, 5]),
+  selectedStyle: 'professional',
+  allCalendars: [],
+  calListOpen: false,
+};
+
+const $ = (id) => document.getElementById(id);
+
+/* ─── OAuth ──────────────────────────────────────────────────── */
+function getClientId() {
+  if (HARDCODED_CLIENT_ID) return HARDCODED_CLIENT_ID;
+  const typed = $('client-id-input').value.trim();
+  if (typed) { localStorage.setItem('ff_client_id', typed); return typed; }
+  return localStorage.getItem('ff_client_id') || '';
+}
+
+function startOAuth() {
+  const clientId = getClientId();
+  if (!clientId || !clientId.includes('.apps.googleusercontent.com')) {
+    showAuthError('Please enter a valid client_id.'); return;
+  }
+  if (location.protocol === 'file:') {
+    showAuthError('OAuth requires a server. Run: python3 -m http.server 8081'); return;
+  }
+  const params = new URLSearchParams({
+    client_id: clientId, redirect_uri: REDIRECT_URI,
+    response_type: 'token', scope: SCOPES, prompt: 'select_account',
+  });
+  location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+}
+
+function handleOAuthCallback() {
+  if (!location.hash) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const token = params.get('access_token');
+  if (!token) return false;
+  history.replaceState(null, '', location.pathname);
+  state.token = token;
+  fetchUserInfo(token);
+  return true;
+}
+
+async function fetchUserInfo(token) {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const info = await res.json();
+      state.email = info.email || 'Connected';
+    } else {
+      state.email = 'Connected';
+    }
+  } catch { state.email = 'Connected'; }
+  setSignedIn();
+  fetchAndRenderCalendars(token);
+}
+
+function setSignedIn() {
+  state.mode = 'signed';
+  state.source = 'real';
+  $('auth-unsigned').style.display = 'none';
+  $('auth-mock-only').style.display = 'none';
+  $('auth-signed').style.display = 'block';
+  $('signed-in-label').textContent = state.email || 'Connected';
+}
+
+function signOut() {
+  state.token = null; state.email = null;
+  state.mode = 'unsigned'; state.allCalendars = [];
+  $('cal-selector').style.display = 'none';
+  $('cal-list').innerHTML = '';
+  resetAuth();
+}
+
+function resetAuth() {
+  $('auth-unsigned').style.display = 'block';
+  $('auth-signed').style.display = 'none';
+  $('auth-mock-only').style.display = 'none';
+  clearOutput();
+}
+
+function useMockOnly() {
+  state.mode = 'mockonly'; state.source = 'mock';
+  $('auth-unsigned').style.display = 'none';
+  $('auth-signed').style.display = 'none';
+  $('auth-mock-only').style.display = 'block';
+}
+
+function showAuthError(msg) {
+  $('auth-error').textContent = msg;
+  $('auth-error').style.display = 'block';
+}
+
+/* ─── Source toggle ──────────────────────────────────────────── */
+function switchSource(src) {
+  state.source = src;
+  $('tab-real').classList.toggle('active', src === 'real');
+  $('tab-mock').classList.toggle('active', src === 'mock');
+  $('cal-selector').style.display = src === 'real' ? 'block' : 'none';
+}
+
+/* ─── Calendar selector ──────────────────────────────────────── */
+async function fetchAndRenderCalendars(token) {
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList?fields=items(id,summary,selected,accessRole,backgroundColor)',
+    { headers: { Authorization: `Bearer ${token}` } }
+  ).catch(() => null);
+  if (!res || !res.ok) return;
+
+  const data = await res.json();
+  const items = (data.items || []).filter(
+    (c) => ['owner', 'writer', 'reader', 'freeBusyReader'].includes(c.accessRole)
+  );
+  const saved = JSON.parse(localStorage.getItem('ff_cal_toggles') || '{}');
+  state.allCalendars = items.map((c) => ({
+    id: c.id, name: c.summary || c.id, color: c.backgroundColor || '#888',
+    checked: c.id in saved ? saved[c.id] : c.selected !== false,
+  }));
+  renderCalList();
+  $('cal-selector').style.display = 'block';
+}
+
+function renderCalList() {
+  const list = $('cal-list');
+  list.innerHTML = '';
+  const checked = state.allCalendars.filter(c => c.checked).length;
+  $('cal-selector-label').textContent = `${checked} of ${state.allCalendars.length} calendars included`;
+  state.allCalendars.forEach((cal, i) => {
+    const item = document.createElement('div');
+    item.className = 'cal-item';
+    item.innerHTML = `
+      <input type="checkbox" id="cal-${i}" ${cal.checked ? 'checked' : ''} />
+      <div style="width:8px;height:8px;border-radius:50%;background:${cal.color};flex-shrink:0"></div>
+      <span class="cal-item-name" title="${cal.id}">${cal.name}</span>
+    `;
+    item.querySelector('input').addEventListener('change', (e) => {
+      state.allCalendars[i].checked = e.target.checked;
+      const saved = JSON.parse(localStorage.getItem('ff_cal_toggles') || '{}');
+      saved[cal.id] = e.target.checked;
+      localStorage.setItem('ff_cal_toggles', JSON.stringify(saved));
+      renderCalList();
+    });
+    list.appendChild(item);
+  });
+}
+
+function toggleCalList() {
+  state.calListOpen = !state.calListOpen;
+  $('cal-list').classList.toggle('open', state.calListOpen);
+  $('cal-selector-toggle').textContent = state.calListOpen ? '▴' : '▾';
+}
+
+function getSelectedCalendarIds() {
+  const sel = state.allCalendars.filter(c => c.checked).map(c => ({ id: c.id }));
+  return sel.length > 0 ? sel : [{ id: 'primary' }];
+}
+
+/* ─── Mock data ──────────────────────────────────────────────── */
+function generateMockBusy(startDate, endDate) {
+  const busy = [];
+  const cursor = new Date(`${startDate}T00:00:00`);
+  const limit  = new Date(`${endDate}T23:59:59`);
+  while (cursor <= limit) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) {
+      const d = cursor.toISOString().split('T')[0];
+      busy.push({ start: `${d}T09:00:00Z`, end: `${d}T09:30:00Z` });
+      busy.push({ start: `${d}T12:00:00Z`, end: `${d}T13:00:00Z` });
+      if ([1,3,5].includes(day)) busy.push({ start: `${d}T14:00:00Z`, end: `${d}T15:00:00Z` });
+      if (day === 2)             busy.push({ start: `${d}T10:00:00Z`, end: `${d}T12:00:00Z` });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { calendars: { primary: { busy } } };
+}
+
+/* ─── Calendar API ───────────────────────────────────────────── */
+async function fetchFreeBusy(token, startDate, endDate, timezone) {
+  const timeMin = new Date(`${startDate}T00:00:00`).toISOString();
+  const timeMax = new Date(`${endDate}T23:59:59`).toISOString();
+  const items   = state.allCalendars.length > 0
+    ? getSelectedCalendarIds()
+    : [{ id: 'primary' }];
+
+  const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timeMin, timeMax, timeZone: timezone, items }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) { signOut(); throw new Error('Session expired — please sign in again.'); }
+    throw new Error(err?.error?.message || `API error ${res.status}`);
+  }
+  return res.json();
+}
+
+/* ─── Free window computation ────────────────────────────────── */
+function toDateStr(d) { return d.toISOString().split('T')[0]; }
+
+function mergeBusy(slots) {
+  if (!slots.length) return [];
+  const s = [...slots].sort((a,b) => a.start - b.start);
+  const m = [{ ...s[0] }];
+  for (let i = 1; i < s.length; i++) {
+    const last = m[m.length - 1];
+    if (s[i].start <= last.end) { if (s[i].end > last.end) last.end = s[i].end; }
+    else m.push({ ...s[i] });
+  }
+  return m;
+}
+
+function computeFreeWindows(busyData, opts) {
+  const { startDate, endDate, startHour, startMin, endHour, endMin, durationMins, selectedDays } = opts;
+  const allBusy = Object.values(busyData?.calendars || {})
+    .flatMap(c => c.busy || [])
+    .map(s => ({ start: new Date(s.start), end: new Date(s.end) }));
+
+  const results = {};
+  const cursor = new Date(`${startDate}T00:00:00`);
+  const limit  = new Date(`${endDate}T23:59:59`);
+
+  while (cursor <= limit) {
+    if (selectedDays.has(cursor.getDay())) {
+      const dateKey  = toDateStr(cursor);
+      const dayStart = new Date(cursor); dayStart.setHours(startHour, startMin, 0, 0);
+      const dayEnd   = new Date(cursor); dayEnd.setHours(endHour, endMin, 0, 0);
+
+      const clipped = allBusy
+        .filter(b => b.start < dayEnd && b.end > dayStart)
+        .map(b => ({
+          start: b.start < dayStart ? new Date(dayStart) : new Date(b.start),
+          end:   b.end   > dayEnd   ? new Date(dayEnd)   : new Date(b.end),
+        }));
+
+      const busy  = mergeBusy(clipped);
+      const free  = [];
+      let freeStart = dayStart;
+
+      for (const b of busy) {
+        if ((b.start - freeStart) / 60000 >= durationMins)
+          free.push({ start: new Date(freeStart), end: new Date(b.start) });
+        if (b.end > freeStart) freeStart = new Date(b.end);
+      }
+      if ((dayEnd - freeStart) / 60000 >= durationMins)
+        free.push({ start: new Date(freeStart), end: new Date(dayEnd) });
+
+      if (free.length) results[dateKey] = free;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return results;
+}
+
+/* ─── Message builder ────────────────────────────────────────── */
+function fmtTime(d, tz) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
+}
+function fmtDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+}
+function tzAbbr(tz) {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+      .formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value || tz;
+  } catch { return tz; }
+}
+
+function buildMessage(windows, style, tz) {
+  const entries = Object.entries(windows);
+  if (!entries.length) return 'No available time slots found for the selected range and preferences.';
+
+  const lines = entries.map(([k, slots]) => {
+    const times = slots.map(s => `${fmtTime(s.start,tz)} – ${fmtTime(s.end,tz)}`).join(', ');
+    return `${fmtDate(k)}: ${times}`;
+  });
+
+  if (style === 'slots') return lines.join('\n');
+  if (style === 'professional') return [
+    'Thank you for reaching out. I would be happy to connect — please find my available windows below:',
+    '', lines.map(l => `• ${l}`).join('\n'), '',
+    `All times are in ${tzAbbr(tz)}. Please let me know which slot works best for you, and I will send a calendar invite.`,
+    '', 'Looking forward to speaking with you.',
+  ].join('\n');
+  if (style === 'casual') return [
+    `Hey! Happy to chat — here's when I'm free:`,
+    '', lines.map(l => `• ${l}`).join('\n'), '',
+    `(All times ${tzAbbr(tz)}) — just pick whatever works and I'll send over an invite!`,
+  ].join('\n');
+  return lines.join('\n');
+}
+
+/* ─── Generate ───────────────────────────────────────────────── */
+async function generate() {
+  $('controls-error').style.display = 'none';
+
+  if (state.mode === 'unsigned') {
+    showControlsError('Sign in with Google or choose "Use mock data" first.'); return;
+  }
+
+  const startDate = $('date-start').value;
+  const endDate   = $('date-end').value;
+  if (!startDate || !endDate) { showControlsError('Select a start and end date.'); return; }
+  if (new Date(startDate) > new Date(endDate)) { showControlsError('Start date must be before end date.'); return; }
+  if (!state.selectedDays.size) { showControlsError('Select at least one day of the week.'); return; }
+
+  const workOn = $('toggle-work-hours').checked;
+  let startHour = 9, startMin = 0, endHour = 17, endMin = 0;
+  if (!workOn) {
+    const cs = $('custom-start').value, ce = $('custom-end').value;
+    if (!cs || !ce) { showControlsError('Set custom start and end times.'); return; }
+    [startHour, startMin] = cs.split(':').map(Number);
+    [endHour, endMin]     = ce.split(':').map(Number);
+    if (startHour * 60 + startMin >= endHour * 60 + endMin) {
+      showControlsError('Start time must be before end time.'); return;
+    }
+  }
+
+  const timezone = $('timezone-select').value;
+  const btn = $('btn-generate');
+  btn.classList.add('loading'); btn.disabled = true;
+
+  try {
+    const useMock = state.source === 'mock' || state.mode === 'mockonly';
+    const busyData = useMock
+      ? generateMockBusy(startDate, endDate)
+      : await fetchFreeBusy(state.token, startDate, endDate, timezone);
+
+    const windows = computeFreeWindows(busyData, {
+      startDate, endDate, startHour, startMin, endHour, endMin,
+      durationMins: state.selectedDuration, selectedDays: state.selectedDays, timezone,
+    });
+
+    const message = buildMessage(windows, state.selectedStyle, timezone);
+    showOutput(message);
+  } catch (err) {
+    showControlsError(err.message || 'Something went wrong.');
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+function showControlsError(msg) {
+  $('controls-error').textContent = msg;
+  $('controls-error').style.display = 'block';
+}
+
+/* ─── Output ─────────────────────────────────────────────────── */
+function showOutput(text) {
+  $('result-empty').style.display    = 'none';
+  $('result-textarea-test').style.display = 'block';
+  $('result-textarea-test').value    = text;
+  $('btn-copy-test').style.display   = 'flex';
+  $('result-meta').style.display     = 'inline';
+  $('result-meta').textContent       = `${text.length} chars`;
+  $('result-dot').style.background   = 'var(--accent)';
+}
+
+function clearOutput() {
+  $('result-empty').style.display    = 'flex';
+  $('result-textarea-test').style.display = 'none';
+  $('btn-copy-test').style.display   = 'none';
+  $('result-meta').style.display     = 'none';
+  $('result-dot').style.background   = 'var(--border)';
+}
+
+async function copyResult() {
+  const text = $('result-textarea-test').value;
+  try { await navigator.clipboard.writeText(text); } catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  showToast('✓ Copied!');
+}
+
+function showToast(msg) {
+  const t = $('toast'); t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ─── Timezones ──────────────────────────────────────────────── */
+function populateTimezones() {
+  const sel = $('timezone-select');
+  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzList = [
+    'Africa/Cairo','Africa/Johannesburg','Africa/Lagos','Africa/Nairobi',
+    'America/Anchorage','America/Argentina/Buenos_Aires','America/Bogota',
+    'America/Chicago','America/Denver','America/Halifax','America/Lima',
+    'America/Los_Angeles','America/Mexico_City','America/New_York',
+    'America/Phoenix','America/Santiago','America/Sao_Paulo',
+    'America/Toronto','America/Vancouver','America/Winnipeg',
+    'Asia/Bangkok','Asia/Colombo','Asia/Dubai','Asia/Hong_Kong',
+    'Asia/Jakarta','Asia/Jerusalem','Asia/Karachi','Asia/Kathmandu',
+    'Asia/Kolkata','Asia/Kuala_Lumpur','Asia/Manila','Asia/Riyadh',
+    'Asia/Seoul','Asia/Shanghai','Asia/Singapore','Asia/Taipei',
+    'Asia/Tehran','Asia/Tokyo','Asia/Vladivostok','Asia/Yangon',
+    'Atlantic/Reykjavik','Australia/Adelaide','Australia/Brisbane',
+    'Australia/Darwin','Australia/Perth','Australia/Sydney',
+    'Europe/Amsterdam','Europe/Athens','Europe/Berlin','Europe/Brussels',
+    'Europe/Budapest','Europe/Dublin','Europe/Helsinki','Europe/Istanbul',
+    'Europe/Lisbon','Europe/London','Europe/Madrid','Europe/Moscow',
+    'Europe/Oslo','Europe/Paris','Europe/Rome','Europe/Stockholm',
+    'Europe/Vienna','Europe/Warsaw','Europe/Zurich',
+    'Pacific/Auckland','Pacific/Fiji','Pacific/Guam','Pacific/Honolulu',
+    'Pacific/Noumea','UTC',
+  ];
+  const all = tzList.includes(detected) ? tzList : [detected, ...tzList];
+  all.forEach(tz => {
+    const opt = document.createElement('option');
+    opt.value = tz; opt.textContent = tz.replace(/_/g, ' ');
+    if (tz === detected) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+/* ─── Date helpers ───────────────────────────────────────────── */
+function startOfWeek(d) {
+  const dt = new Date(d), day = dt.getDay();
+  dt.setDate(dt.getDate() + (day === 0 ? -6 : 1 - day)); return dt;
+}
+function setQuickRange(range) {
+  const today = new Date();
+  let start, end;
+  if (range === 'this-week')    { start = startOfWeek(today); end = new Date(start); end.setDate(end.getDate()+4); }
+  if (range === 'next-week')    { start = startOfWeek(today); start.setDate(start.getDate()+7); end = new Date(start); end.setDate(end.getDate()+4); }
+  if (range === 'next-2-weeks') { start = startOfWeek(today); start.setDate(start.getDate()+7); end = new Date(start); end.setDate(end.getDate()+11); }
+  $('date-start').value = toDateStr(start);
+  $('date-end').value   = toDateStr(end);
+}
+
+function singleChipGroup(groupId, cb) {
+  $(groupId).querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      $(groupId).querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected'); cb(chip);
+    });
+  });
+}
+
+/* ─── Init ───────────────────────────────────────────────────── */
+function init() {
+  // Restore client_id — hide the input if already saved
+  const savedId = localStorage.getItem('ff_client_id') || HARDCODED_CLIENT_ID;
+  if (savedId) {
+    $('client-id-input').value = savedId;
+    $('client-id-row').style.display = 'none';
+    $('auth-card-title').style.display = 'none';
+  }
+
+  // Handle OAuth redirect
+  handleOAuthCallback();
+
+  populateTimezones();
+  setQuickRange('next-week');
+
+  // Quick date chips
+  $('quick-date-chips').querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      $('quick-date-chips').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      setQuickRange(chip.dataset.range);
+    });
+  });
+
+  // Day chips
+  $('day-chips').querySelectorAll('.day-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const day = parseInt(chip.dataset.day, 10);
+      chip.classList.toggle('selected');
+      chip.classList.contains('selected') ? state.selectedDays.add(day) : state.selectedDays.delete(day);
+    });
+  });
+
+  // Work hours toggle
+  const toggle = $('toggle-work-hours');
+  const customH = $('custom-hours');
+  toggle.addEventListener('change', () => customH.classList.toggle('visible', !toggle.checked));
+
+  // Duration chips
+  singleChipGroup('duration-chips', chip => {
+    state.selectedDuration = parseInt(chip.dataset.duration, 10);
+    $('custom-duration').value = '';
+    localStorage.setItem('ff_duration', state.selectedDuration);
+  });
+
+  // Custom duration
+  $('custom-duration').addEventListener('input', e => {
+    const val = parseInt(e.target.value, 10);
+    if (val >= 5 && val <= 480) {
+      state.selectedDuration = val;
+      $('duration-chips').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      localStorage.setItem('ff_duration', val);
+    }
+  });
+
+  // Restore saved duration
+  const savedDur = localStorage.getItem('ff_duration');
+  if (savedDur) {
+    const d = parseInt(savedDur, 10);
+    state.selectedDuration = d;
+    const preset = $('duration-chips').querySelector(`[data-duration="${d}"]`);
+    if (preset) {
+      $('duration-chips').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      preset.classList.add('selected');
+    } else {
+      $('duration-chips').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      $('custom-duration').value = d;
+    }
+  }
+
+  // Style chips
+  singleChipGroup('style-chips', chip => {
+    state.selectedStyle = chip.dataset.style;
+    localStorage.setItem('ff_style', state.selectedStyle);
+  });
+
+  // Restore saved style
+  const savedStyle = localStorage.getItem('ff_style');
+  if (savedStyle) {
+    state.selectedStyle = savedStyle;
+    $('style-chips').querySelectorAll('.chip').forEach(c => {
+      c.classList.toggle('selected', c.dataset.style === savedStyle);
+    });
+  }
+
+  $('btn-generate').addEventListener('click', generate);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

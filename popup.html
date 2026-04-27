@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhenAmIFree</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="popup-wrapper">
+
+    <!-- ═══ AUTH SCREEN ═══ -->
+    <div id="screen-auth" class="screen auth-screen active">
+      <div class="auth-icon">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <line x1="9" y1="15" x2="12" y2="15"></line>
+          <line x1="12" y1="15" x2="12" y2="18"></line>
+        </svg>
+      </div>
+      <h1 class="auth-title" style="font-size:26px;letter-spacing:-0.5px">WhenAmIFree</h1>
+      <p class="auth-subtitle">
+        Connect your Google Calendar to instantly draft availability messages for recruiters.
+      </p>
+      <button id="btn-connect" class="btn-primary">
+        <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Connect Calendar
+      </button>
+      <div id="auth-error" class="notice error" style="margin-top:14px;display:none;max-width:280px;text-align:left;"></div>
+    </div>
+
+    <!-- ═══ CONTROLS SCREEN ═══ -->
+    <div id="screen-controls" class="screen controls-screen">
+      <!-- Header -->
+      <div class="header">
+        <div class="header-brand">
+          <span class="wordmark" style="font-size:17px;letter-spacing:-0.5px">WhenAmIFree</span>
+          <span class="tagline">availability</span>
+        </div>
+        <button id="btn-signout" class="btn-signout">sign out</button>
+      </div>
+
+      <!-- Body -->
+      <div class="controls-body">
+
+        <!-- Date Range -->
+        <div class="form-group">
+          <label class="form-label">Date Range</label>
+          <div class="date-inputs">
+            <input type="date" id="date-start" class="input-field" />
+            <input type="date" id="date-end" class="input-field" />
+          </div>
+          <div class="chip-group" id="quick-date-chips">
+            <button class="chip" data-range="this-week">This week</button>
+            <button class="chip" data-range="next-week">Next week</button>
+            <button class="chip" data-range="next-2-weeks">Next 2 weeks</button>
+          </div>
+        </div>
+
+        <!-- Available Hours -->
+        <div class="form-group">
+          <label class="form-label">Available Hours</label>
+          <div class="toggle-row">
+            <span class="toggle-label">Work hours only (9 am – 5 pm)</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-work-hours" checked />
+              <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+              </div>
+            </label>
+          </div>
+          <div class="custom-hours" id="custom-hours">
+            <div>
+              <label class="form-label" style="margin-bottom:4px">From</label>
+              <input type="time" id="custom-start" class="input-field" value="09:00" />
+            </div>
+            <div>
+              <label class="form-label" style="margin-bottom:4px">To</label>
+              <input type="time" id="custom-end" class="input-field" value="17:00" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Slot Duration -->
+        <div class="form-group">
+          <label class="form-label">Slot Duration</label>
+          <div class="chip-group" id="duration-chips">
+            <button class="chip" data-duration="30">30 min</button>
+            <button class="chip selected" data-duration="45">45 min</button>
+            <button class="chip" data-duration="60">60 min</button>
+            <button class="chip" data-duration="90">90 min</button>
+          </div>
+          <div class="custom-duration-row">
+            <span class="custom-duration-label">Custom</span>
+            <input type="number" id="custom-duration" class="input-field custom-duration-input" min="5" max="480" placeholder="min" />
+          </div>
+        </div>
+
+        <!-- Days of Week -->
+        <div class="form-group">
+          <label class="form-label">Days of Week</label>
+          <div class="day-chips" id="day-chips">
+            <button class="day-chip selected" data-day="1">M</button>
+            <button class="day-chip selected" data-day="2">T</button>
+            <button class="day-chip selected" data-day="3">W</button>
+            <button class="day-chip selected" data-day="4">Th</button>
+            <button class="day-chip selected" data-day="5">F</button>
+            <button class="day-chip" data-day="6">Sa</button>
+            <button class="day-chip" data-day="0">Su</button>
+          </div>
+        </div>
+
+        <!-- Timezone -->
+        <div class="form-group">
+          <label class="form-label">Timezone</label>
+          <select id="timezone-select" class="select-field"></select>
+        </div>
+
+        <!-- Message Style -->
+        <div class="form-group">
+          <label class="form-label">Message Style</label>
+          <div class="chip-group" id="style-chips">
+            <button class="chip selected" data-style="professional">Professional</button>
+            <button class="chip" data-style="casual">Casual</button>
+            <button class="chip" data-style="slots">Slots only</button>
+          </div>
+        </div>
+
+        <!-- Error notice -->
+        <div id="controls-error" class="notice error" style="display:none;"></div>
+
+      </div><!-- /controls-body -->
+
+      <!-- Sticky Footer -->
+      <div class="controls-footer">
+        <button id="btn-generate" class="btn-generate">
+          <div class="spinner"></div>
+          <span class="btn-text">Find My Availability</span>
+        </button>
+      </div>
+    </div><!-- /controls-screen -->
+
+    <!-- ═══ RESULT SCREEN ═══ -->
+    <div id="screen-result" class="screen result-screen">
+      <!-- Header -->
+      <div class="result-header">
+        <div class="result-title">
+          <div class="result-title-dot"></div>
+          Availability Draft
+        </div>
+        <div class="result-actions-top">
+          <button id="btn-regenerate" class="btn-ghost">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Regenerate
+          </button>
+          <button id="btn-signout-result" class="btn-signout">sign out</button>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="result-body">
+        <textarea id="result-textarea" class="result-textarea" readonly></textarea>
+      </div>
+
+      <!-- Footer -->
+      <div class="result-footer">
+        <button id="btn-back" class="btn-back">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Edit
+        </button>
+        <button id="btn-copy" class="btn-copy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy to clipboard
+        </button>
+      </div>
+    </div><!-- /result-screen -->
+
+    <!-- Toast -->
+    <div id="toast" class="toast">✓ Copied!</div>
+
+  </div><!-- /popup-wrapper -->
+
+  <script src="popup.js"></script>
+</body>
+</html>
